@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Random Joke Generator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --accent:#ffcc00;
+      --muted:#9aa4b2;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:linear-gradient(180deg,#071021 0%, #0f1724 100%);
+      color:#e6eef6;
+      padding:24px;
+    }
+    .container{
+      width:100%;
+      max-width:780px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:14px;
+      padding:28px;
+      box-shadow:0 10px 30px rgba(2,6,23,0.7);
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+    .joke-card{
+      background:var(--card);
+      padding:22px;
+      border-radius:10px;
+      margin-top:16px;
+      min-height:120px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      justify-content:center;
+      position:relative;
+      border:1px solid rgba(255,255,255,0.02);
+    }
+    .joke-text{font-size:18px;line-height:1.4}
+    .joke-setup{font-weight:600}
+    .joke-delivery{font-style:italic;color:#dbe7ff}
+    .meta{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .btn{
+      background:var(--accent);
+      color:#071021;
+      border:none;
+      padding:10px 14px;
+      border-radius:8px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .btn.secondary{background:transparent;color:var(--accent);border:1px solid rgba(255,204,0,0.12)}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap}
+    select,input[type=checkbox]{background:var(--glass);border:1px solid rgba(255,255,255,0.03);color:var(--muted);padding:8px;border-radius:8px}
+    .small{font-size:13px;color:var(--muted)}
+    .loader{width:22px;height:22px;border-radius:50%;border:3px solid rgba(255,255,255,0.08);border-top-color:var(--accent);animation:spin 1s linear infinite;display:inline-block;vertical-align:middle}
+    .fallback-note{color:#ffd, font-size:13px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .toolbar{display:flex;gap:8px;align-items:center}
+    .actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+    footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
+    @media (max-width:520px){
+      .joke-text{font-size:16px}
+    }
+  </style>
+</head>
+<body>
+  <div class="container" role="main">
+    <header>
+      <div>
+        <h1>Random Joke Generator</h1>
+        <p class="lead">Fetch a fresh joke from an external API. Safe-listing applied to avoid offensive jokes.</p>
+      </div>
+      <div class="toolbar">
+        <span class="small">Source</span>
+        <select id="api-select" aria-label="Choose joke API">
+          <option value="jokeapi">JokeAPI (recommended)</option>
+          <option value="official">Official Joke API (fallback)</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="joke-card" aria-live="polite" id="joke-card">
+      <div id="joke-content" class="joke-text">
+        <span class="small" id="hint">Click "New joke" to get started. 😉</span>
+      </div>
+
+      <div class="meta">
+        <div id="joke-category" class="small" aria-hidden="true"></div>
+        <div class="actions" role="group" aria-label="joke actions">
+          <button id="new-joke" class="btn">New joke</button>
+          <button id="copy-joke" class="btn secondary" title="Copy joke to clipboard">Copy</button>
+          <button id="tweet-joke" class="btn secondary" title="Share on Twitter">Tweet</button>
+        </div>
+      </div>
+
+      <div class="controls" style="margin-top:12px;">
+        <label class="small"><input id="allow-nsfw" type="checkbox"> Allow potentially adult / explicit jokes</label>
+        <label class="small" style="margin-left:auto">If API fails, use local fallback <input id="use-fallback" type="checkbox" checked style="margin-left:6px"></label>
+      </div>
+    </div>
+
+    <footer>
+      Built with fetch(); Uses <a href="https://v2.jokeapi.dev/" style="color:var(--accent)">JokeAPI</a> and <a href="https://official-joke-api.appspot.com/" style="color:var(--accent)">Official Joke API</a> as fallback.
+    </footer>
+  </div>
+
+  <script>
+    // Simple Random Joke Generator using external APIs with graceful fallback
+    const newJokeBtn = document.getElementById('new-joke');
+    const jokeContent = document.getElementById('joke-content');
+    const jokeCategory = document.getElementById('joke-category');
+    const copyBtn = document.getElementById('copy-joke');
+    const tweetBtn = document.getElementById('tweet-joke');
+    const apiSelect = document.getElementById('api-select');
+    const allowNsfw = document.getElementById('allow-nsfw');
+    const useFallback = document.getElementById('use-fallback');
+
+    // Local fallback jokes (used if APIs fail and fallback enabled)
+    const localJokes = [
+      "Why don't scientists trust atoms? Because they make up everything!",
+      "I told my computer I needed a break, and it said 'No problem — I'll go to sleep.'",
+      "Why did the scarecrow win an award? Because he was outstanding in his field!",
+      "I would tell you a UDP joke, but you might not get it.",
+      "I asked the librarian if the library had books on paranoia. She whispered, 'They're right behind you.'"
+    ];
+
+    // Helper to show a spinner in the New joke button and in the card
+    function setLoading(on) {
+      if (on) {
+        newJokeBtn.disabled = true;
+        newJokeBtn.innerHTML = '<span class="loader" aria-hidden="true"></span> Loading...';
+      } else {
+        newJokeBtn.disabled = false;
+        newJokeBtn.textContent = 'New joke';
+      }
+    }
+
+    // Render joke text: handles both single and two-part jokes
+    function renderJoke({category = '', type = 'single', joke = '', setup = '', delivery = ''}) {
+      jokeCategory.textContent = category ? `Category: ${category}` : '';
+      if (type === 'single') {
+        jokeContent.innerHTML = `<div>${escapeHtml(joke)}</div>`;
+      } else {
+        // two part: show setup bold, delivery italic
+        jokeContent.innerHTML = `
+          <div class="joke-setup">${escapeHtml(setup)}</div>
+          <div class="joke-delivery">${escapeHtml(delivery)}</div>
+        `;
+      }
+      // update tweet / copy targets
+      currentDisplayed = (type === 'single') ? joke : `${setup} — ${delivery}`;
+    }
+
+    // Escape HTML to avoid injection
+    function escapeHtml(s) {
+      if (!s) return '';
+      return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    // Keep track of current joke text
+    let currentDisplayed = '';
+
+    // Copy to clipboard
+    copyBtn.addEventListener('click', async () => {
+      if (!currentDisplayed) return alert('No joke to copy.');
+      try {
+        await navigator.clipboard.writeText(currentDisplayed);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(()=> copyBtn.textContent = 'Copy', 1500);
+      } catch (err) {
+        alert('Copy failed: ' + err);
+      }
+    });
+
+    // Tweet button opens twitter intent
+    tweetBtn.addEventListener('click', () => {
+      if (!currentDisplayed) return alert('No joke to tweet.');
+      const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(currentDisplayed)}&via=`;
+      window.open(url, '_blank', 'noopener,noreferrer,width=600,height=400');
+    });
+
+    // Primary fetch from JokeAPI (v2)
+    async function fetchFromJokeAPI(allowExplicit=false) {
+      // blacklist certain flags by default
+      const blacklist = allowExplicit ? '' : 'blacklistFlags=nsfw,religious,political,racist,sexist,explicit';
+      // request any joke category; accept both single and twopart
+      const url = `https://v2.jokeapi.dev/joke/Any?${blacklist}&format=json`;
+      const res = await fetch(url, {cache: "no-store"});
+      if (!res.ok) throw new Error('JokeAPI response not ok: ' + res.status);
+      return res.json();
+    }
+
+    // Fallback: Official Joke API
+    async function fetchFromOfficial() {
+      // Official joke API returns a single random joke
+      const url = 'https://official-joke-api.appspot.com/random_joke';
+      const res = await fetch(url, {cache: "no-store"});
+      if (!res.ok) throw new Error('Official Joke API not ok: ' + res.status);
+      return res.json();
+    }
+
+    // Main fetch logic with fallback behavior
+    async function getJoke() {
+      setLoading(true);
+      jokeCategory.textContent = '';
+      try {
+        const api = apiSelect.value;
+        if (api === 'jokeapi') {
+          const data = await fetchFromJokeAPI(allowNsfw.checked);
+          // JokeAPI returns either type "single" or "twopart"
+          if (data && data.error) throw new Error('JokeAPI returned error');
+          if (data.type === 'single') {
+            renderJoke({category: data.category, type: 'single', joke: data.joke});
+          } else {
+            renderJoke({category: data.category, type: 'twopart', setup: data.setup, delivery: data.delivery});
+          }
+        } else {
+          // official API
+          const data = await fetchFromOfficial();
+          // Official returns {setup, punchline}
+          renderJoke({category: data.type || '', type: 'twopart', setup: data.setup, delivery: data.punchline});
+        }
+      } catch (err) {
+        console.error('Primary API failed:', err);
+        // Attempt alternate API if available
+        try {
+          if (apiSelect.value === 'jokeapi') {
+            const data = await fetchFromOfficial();
+            renderJoke({category: data.type || '', type: 'twopart', setup: data.setup, delivery: data.punchline});
+          } else {
+            const data = await fetchFromJokeAPI(allowNsfw.checked);
+            if (data.type === 'single') {
+              renderJoke({category: data.category, type: 'single', joke: data.joke});
+            } else {
+              renderJoke({category: data.category, type: 'twopart', setup: data.setup, delivery: data.delivery});
+            }
+          }
+        } catch (err2) {
+          console.error('Both APIs failed:', err2);
+          if (useFallback.checked && localJokes.length) {
+            const j = localJokes[Math.floor(Math.random() * localJokes.length)];
+            renderJoke({type:'single', joke: j});
+            jokeCategory.textContent = 'Fallback: local joke';
+          } else {
+            jokeContent.innerHTML = `<div class="small">Sorry — couldn't fetch a joke right now. Try again later.</div>`;
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // Wire up "New joke" button
+    newJokeBtn.addEventListener('click', getJoke);
+
+    // Optionally load an initial joke
+    // getJoke(); // uncomment to auto-load on page open
+  </script>
+</body>
+</html>
